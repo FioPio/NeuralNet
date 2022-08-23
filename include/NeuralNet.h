@@ -38,22 +38,24 @@ class NeuralNet
 {
     std::vector<LayerConfig> _net_topology;    // Each value is a layer, and the number represents the total neurons the layer has.
     std::vector<Matrix> _net_weights;  // A vector that contains the weights for each layer connection.
-    
     std::vector<Matrix> _net_bias;     // A vector containing the bias for each connection.
+    std::vector<Matrix> _net_values;   // Contains the values of the input on each layer.
+    float best_accuracy;
+    std::vector<Matrix> _net_best_weights;
     
     float _learning_rate;
     
-public:
-    std::vector<Matrix> _net_values;   // Contains the values of the input on each layer.
+    
+    bool feedForward(std::vector<float> input_data);
+    bool backPropagate(std::vector<float> output_data);
+    bool earlyStop(int tolerance, int min_delta, float train_loss, float validation_loss, int & times_huge_difference);
     
 public:
     NeuralNet(std::vector <LayerConfig> topology, float learing_rate = 0.1f);
     void save(std::string path_to_save);
     void load(std::string path_to_load);
-    bool feedForward(std::vector<float> input_data);
-    bool backPropagate(std::vector<float> output_data);
     std::vector <float> predict(std::vector <float> input_data);
-    int train(std::vector<std::vector<float>> input_data, std::vector<std::vector<float>> output_data, int number_of_epochs, int number_of_batchs, std::vector<std::vector<float>> validate_input_data={}, std::vector<std::vector<float>> validate_output_data={});
+    int train(std::vector<std::vector<float>> input_data, std::vector<std::vector<float>> output_data, int number_of_epochs, int batch_size, std::vector<std::vector<float>> validate_input_data={}, std::vector<std::vector<float>> validate_output_data={});
     float test(std::vector<std::vector<float>> input_data, std::vector<std::vector<float>> output_data, float tolerance = 0.05);
 };
 

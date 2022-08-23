@@ -7,8 +7,8 @@ NeuralNet::NeuralNet(std::vector <LayerConfig> topology, float learning_rate )
     _net_weights = {};
     _net_values = {};
     _net_bias = {};
-    
     _learning_rate = learning_rate;
+    best_accuracy = 0;
     
     
     // Create the weight matrices
@@ -126,50 +126,134 @@ std::vector <float> NeuralNet::predict(std::vector <float> input_data)
 }
 
 
-// FALTA IMPLEMENTAR EARLY STOP I  BATCH SIZE!
-int NeuralNet::train(std::vector<std::vector<float>> input_data, std::vector<std::vector<float>> output_data, int number_of_epochs, int number_of_batchs,  std::vector<std::vector<float>> validate_input_data, std::vector<std::vector<float>> validate_output_data)
+
+int NeuralNet::train(std::vector<std::vector<float>> input_data, std::vector<std::vector<float>> output_data, int number_of_epochs, int batch_size,  std::vector<std::vector<float>> validate_input_data, std::vector<std::vector<float>> validate_output_data)
 {
     bool validate = true;
     if (validate_input_data.size() == 0 || validate_output_data .size() == 0)
         validate = false;
     
+    int tolerance=2; 
+    int min_delta=5;
     printf("[INFO] Starting training the model.\n");
 
     // Getting initial time
     clock_t start_time = clock();
     clock_t end_time;
     float elapsed_time = 0;
-    float loss = 0; // Es calcula per batch
+    std::vector<float> train_loss; // Es calcula per batch
+    std::vector<float> validation_loss; // Es calcula per batch
+    
+    int number_of_batch = input_data.size() / batch_size;
+    if (number_of_batch * batch_size < input_data.size() )
+        number_of_batch++;
+    
+    int times_huge_loss_difference = 0;
     // Setting float to be displayed as 0.2f
     std::cout << std::setprecision(2) << std::fixed;
     for (int num_epoch = 0; num_epoch < number_of_epochs; num_epoch++ )
     {
-        if (num_epoch % number_of_batchs == 0)
-        {
-            loss = 0;
-        }
-        int index = rand() % 4;
-        feedForward(input_data[index]);
-        backPropagate(output_data[index]);
+        
+        int iterations = 0;
         float square_error = 0;
-        for (int num_output = 0; num_output < output_data[index].size(); num_output++)
+        
+        // Training by batch
+        for ( int num_batch = 0; num_batch < number_of_batch ; num_batch++)
         {
-            float error = output_data[index][num_output] - _net_values.back()._values[num_output];
-            square_error+= error * error;
+            int starting_index = num_batch * batch_size;
+            int end_index = (num_batch + 1) * batch_size;
+            
+            if (end_index > input_data.size() )
+                end_index = input_data.size();
+            
+            for (int num_input_data = starting_index; num_input_data<end_index; num_input_data++)
+            {
+                feedForward(input_data[num_input_data]);
+                backPropagate(output_data[num_input_data]);
+                for (int num_output = 0; num_output < output_data[num_input_data].size(); num_output++)
+                {
+                    float error = output_data[num_input_data][num_output] - _net_values.back()._values[num_output];
+                    square_error += error * error;
+                    iterations++;
+                }
+            }
         }
         
-        loss += square_error / ((int) output_data[index].size());
+        // Computing training loss
+        float epoch_train_loss = 0;
+        float epoch_validation_loss = 0;
         
+        epoch_train_loss = square_error / iterations;
+            
+        // Computing validation loss
+        if (validate)
+        {
+            square_error = 0;
+            iterations = 0;
+            for (int num_validation_data = 0; num_validation_data < validate_input_data.size();num_validation_data++)
+            {
+                for (int num_output = 0; num_output < validate_output_data[num_validation_data].size(); num_output++)
+                {
+                    feedForward(validate_input_data[num_validation_data]);
+                    float error = validate_output_data[num_validation_data][num_output] - _net_values.back()._values[num_output];
+                    square_error+= error * error;
+                    iterations++;
+                }
+            }
+            epoch_validation_loss += square_error / iterations;
+        }
         end_time = clock();
         
+            
         float part_done = (((float) num_epoch + 1) / number_of_epochs );
         elapsed_time = float(end_time - start_time)/CLOCKS_PER_SEC;
         
-        std::cout << "\r[" << num_epoch + 1 << "/" << number_of_epochs  << "] " << 100 * part_done << "%. Loss: "<< loss*1000 <<" Elapsed: "<< elapsed_time <<"s, Total: "<<elapsed_time/part_done  <<"s." << std::flush;
+        std::cout << "\r[" << num_epoch + 1 << "/" << number_of_epochs  << "] " << 100 * part_done << "% Loss: "<< epoch_train_loss <<" acc:" <<  best_accuracy <<" Elapsed: "<< elapsed_time <<"s Total: "<<elapsed_time/part_done  <<"s." << std::flush;
+        // Checking accuracy 
+        float batch_train_accuracy = NeuralNet::test(input_data, output_data);
+        if (batch_train_accuracy > best_accuracy)
+        {
+            best_accuracy = batch_train_accuracy;
+            _net_best_weights = _net_weights;
+            if(best_accuracy>0.9999)
+            {
+                float part_done = (((float) num_epoch + 1) / number_of_epochs );
+                std::cout << "\r[" << num_epoch + 1 << "/" << number_of_epochs  << "] " << 100 * part_done << "%. Loss: "<< epoch_train_loss <<" acc:" <<  best_accuracy <<" Elapsed: "<< elapsed_time <<"s, Total: "<<elapsed_time/part_done  <<"s." << std::flush;
+                printf("\n");
+                printf("    -> EARLY STOPPING\n");
+                printf("    -> Done in %0.2fs.\n", elapsed_time);
+                return num_epoch;
+            }
+        }
+        
+        if (validate)
+        {
+            // Checking if early stop is required
+            if ( earlyStop(tolerance, min_delta, epoch_train_loss, epoch_validation_loss, times_huge_loss_difference))
+            {
+                float part_done = (((float) num_epoch + 1) / number_of_epochs );
+                std::cout << "\r[" << num_epoch + 1 << "/" << number_of_epochs  << "] " << 100 * part_done << "%. Loss: "<< epoch_train_loss <<" acc:" <<  best_accuracy <<" Elapsed: "<< elapsed_time <<"s, Total: "<<elapsed_time/part_done  <<"s." << std::flush;
+                printf("\n");
+                printf("    -> EARLY STOPPING\n");
+                printf("    -> Done in %0.2fs.\n", elapsed_time);
+                return num_epoch;
+            }
+        }
     }
     printf("\n");
     printf("    -> Done in %0.2fs.\n", elapsed_time);
     return number_of_epochs;
+}
+
+bool NeuralNet::earlyStop(int tolerance, int min_delta, float train_loss, float validation_loss, int & times_huge_difference)
+{
+    if (validation_loss - train_loss > min_delta)
+        times_huge_difference++;
+    
+    if (times_huge_difference > tolerance)
+        return true;
+    
+    return false;
 }
 
 float NeuralNet::test(std::vector<std::vector<float>> input_data, std::vector<std::vector<float>> output_data, float tolerance )

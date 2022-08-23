@@ -54,7 +54,7 @@ void runTests()
         {1.0f},
         {1.0f}    
     };
-    int epochs = 10000;
+    int epochs = 100000;
     int batch = 4;
     
     nn.train(input_data, output_data, epochs, batch );
