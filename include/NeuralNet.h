@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Matrix.h"
+#include <string>
+
 
 class NeuralNet
 {
@@ -11,4 +13,4 @@ class NeuralNet
 public:
     void save(std::string path_to_save);
     void load(std::string path_to_load);
-}
+};
