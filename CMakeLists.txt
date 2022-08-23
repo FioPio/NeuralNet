@@ -13,6 +13,7 @@ add_executable( main
  src/main.cpp
  include/Matrix.h
  src/Matrix.cpp
-
+ include/NeuralNet.h
+ src/NeuralNet.cpp
 )
 #target_link_libraries( main  ${OpenCV_LIBS} )
