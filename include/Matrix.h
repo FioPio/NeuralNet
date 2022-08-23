@@ -13,4 +13,8 @@ public:
     Matrix multiply (Matrix & matrix_to_multiply);
     Matrix add ( Matrix & matrix_to_add);
     Matrix subtract ( Matrix & matrix_to_add);
+    Matrix addScalar ( float scalar_to_add);
+    Matrix multiplyByScalar ( float multiplying_scalar);
+    Matrix negative ();
+    Matrix transpose ();
 };
